@@ -1,6 +1,6 @@
 # Motor Imagery Classification using Hybrid SNN and Advanced Methods
 
-![Project Banner](path_to_image_or_screenshot)
+![Project Banner](https://github.com/alirzx/MotorImagary-Classification-using-Hybrid-SNN-and-Advance-method/blob/main/bciiv2a.png?raw=true)
 
 ## Table of Contents
 - [Overview](#overview)
