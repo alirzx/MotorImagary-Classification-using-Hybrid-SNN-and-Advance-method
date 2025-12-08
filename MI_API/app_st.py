@@ -94,49 +94,54 @@ def call_dummy_predict_subject(subject_id: int):
         return None
 
     
-
 # ----------------------------
-# Visualization Helpers
+# Visualization Helpers (Plotly)
 # ----------------------------
-import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
-import streamlit as st
 import pandas as pd
+import streamlit as st
+import plotly.graph_objects as go
+import plotly.express as px
 
 # ----------------------------
 # Raw EEG Signal Plot
 # ----------------------------
-def plot_raw_eeg_signal(eeg_2d, channels_to_plot=16, title="Raw EEG Signal"):
-    """
-    eeg_2d: (num_channels, num_samples) numpy array
-    channels_to_plot: number of top channels to show
-    """
+def plot_raw_eeg_signal_plotly(eeg_2d, channels_to_plot=16):
     num_channels = min(channels_to_plot, eeg_2d.shape[0])
-    fig, ax = plt.subplots(figsize=(12, 5))
+    fig = go.Figure()
     for i in range(num_channels):
-        ax.plot(eeg_2d[i], label=f"Ch {i+1}")
-    ax.set_title(f"{title} — first {num_channels} channels", fontsize=14, fontweight="bold")
-    ax.set_xlabel("Sample", fontsize=12)
-    ax.set_ylabel("Amplitude", fontsize=12)
-    ax.grid(True, linestyle="--", alpha=0.5)
-    ax.legend(loc="upper right", fontsize=10)
-    st.pyplot(fig)
+        fig.add_trace(go.Scatter(y=eeg_2d[i], mode='lines', name=f"Ch {i+1}"))
+    fig.update_layout(
+        title=f"Raw EEG Signal — first {num_channels} channels",
+        xaxis_title="Sample",
+        yaxis_title="Amplitude",
+        template="plotly_white",
+        height=400
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ----------------------------
 # Single Subject Probability Bar
 # ----------------------------
 def plot_probabilities_single(prob_list, subject_id, class_labels=["Class 0", "Class 1"]):
-    fig, ax = plt.subplots(figsize=(6, 4))
-    colors = sns.color_palette("Set2", len(prob_list))
-    ax.bar(class_labels, prob_list, color=colors, edgecolor="black")
-    ax.set_ylim(0, 1)
+    fig = go.Figure()
     for i, p in enumerate(prob_list):
-        ax.text(i, p + 0.02, f"{p:.2f}", ha="center", fontsize=12, fontweight="bold")
-    ax.set_title(f"Prediction Probabilities — Subject {subject_id}", fontsize=14, fontweight="bold")
-    ax.set_ylabel("Probability", fontsize=12)
-    st.pyplot(fig)
+        fig.add_trace(go.Bar(
+            x=[class_labels[i]],
+            y=[p],
+            text=[f"{p:.2f}"],
+            textposition="outside",
+            marker_color=px.colors.qualitative.Set2[i]
+        ))
+    fig.update_layout(
+        title=f"Prediction Probabilities — Subject {subject_id}",
+        yaxis=dict(range=[0, 1], title="Probability"),
+        template="plotly_white",
+        showlegend=False,
+        height=400
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ----------------------------
@@ -146,24 +151,24 @@ def plot_multisubject_probabilities(results_dict, class_labels=["Class 0", "Clas
     subjects = list(results_dict.keys())
     probs = np.array([results_dict[s]["probabilities"] for s in subjects])
     
-    x = np.arange(len(subjects))
-    width = 0.3
-    fig, ax = plt.subplots(figsize=(12, 5))
-    colors = sns.color_palette("Set2", len(class_labels))
-    
+    fig = go.Figure()
     for i, cls in enumerate(class_labels):
-        ax.bar(x + i*width - width/2, probs[:, i], width=width, label=cls, color=colors[i], edgecolor="black")
-        for j, p in enumerate(probs[:, i]):
-            ax.text(x[j] + i*width - width/2, p + 0.02, f"{p:.2f}", ha="center", fontsize=10, fontweight="bold")
-    
-    ax.set_xticks(x)
-    ax.set_xticklabels([f"S{s}" for s in subjects], rotation=45)
-    ax.set_ylim(0, 1)
-    ax.set_title("Prediction Probabilities Across All Subjects", fontsize=14, fontweight="bold")
-    ax.set_ylabel("Probability", fontsize=12)
-    ax.legend(fontsize=10)
-    ax.grid(True, linestyle="--", alpha=0.3)
-    st.pyplot(fig)
+        fig.add_trace(go.Bar(
+            x=[f"S{s}" for s in subjects],
+            y=probs[:, i],
+            name=cls,
+            text=[f"{v:.2f}" for v in probs[:, i]],
+            textposition="outside",
+            marker_color=px.colors.qualitative.Set2[i]
+        ))
+    fig.update_layout(
+        title="Prediction Probabilities Across All Subjects",
+        yaxis=dict(range=[0, 1], title="Probability"),
+        barmode='group',
+        template="plotly_white",
+        height=450
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ----------------------------
@@ -174,13 +179,15 @@ def plot_prob_heatmap(results_dict, class_labels=["Class 0", "Class 1"], title="
     all_probs = np.array([results_dict[s]["probabilities"] for s in subjects])
     df = pd.DataFrame(all_probs, index=[f"Subject {s}" for s in subjects], columns=class_labels)
     
-    fig, ax = plt.subplots(figsize=(len(class_labels)*2.5, len(subjects)*0.6 + 2))
-    sns.heatmap(df, annot=True, fmt=".2f", cmap="viridis", cbar=True, linewidths=0.5,
-                annot_kws={"fontsize":10, "weight":"bold"}, ax=ax)
-    ax.set_title(title, fontsize=14, fontweight="bold", pad=12)
-    ax.set_xlabel("Classes", fontsize=12, fontweight="bold")
-    ax.set_ylabel("Subjects", fontsize=12, fontweight="bold")
-    st.pyplot(fig)
+    fig = px.imshow(
+        df,
+        text_auto=".2f",
+        color_continuous_scale="Viridis",
+        labels=dict(x="Classes", y="Subjects", color="Probability"),
+        aspect="auto"
+    )
+    fig.update_layout(title=title, template="plotly_white", height=300 + len(subjects)*20)
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ----------------------------
@@ -192,20 +199,24 @@ def plot_radar_multisubject(results_dict, class_index=1, title="Class 1 Confiden
     
     # Radar requires circular closure
     probs += probs[:1]
-    angles = np.linspace(0, 2*np.pi, len(subjects), endpoint=False).tolist()
-    angles += angles[:1]
+    labels = [f"S{s}" for s in subjects]
+    labels += labels[:1]
     
-    fig = plt.figure(figsize=(6, 6))
-    ax = fig.add_subplot(111, polar=True)
-    ax.plot(angles, probs, marker='o', linewidth=2)
-    ax.fill(angles, probs, alpha=0.25)
-    
-    ax.set_xticks(np.linspace(0, 2*np.pi, len(subjects), endpoint=False))
-    ax.set_xticklabels([f"S{s}" for s in subjects], fontsize=10)
-    ax.set_ylim(0, 1)
-    ax.set_title(title, fontsize=14, fontweight="bold", pad=10)
-    ax.grid(True)
-    st.pyplot(fig)
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=probs,
+        theta=labels,
+        fill='toself',
+        name=f"Class {class_index}"
+    ))
+    fig.update_layout(
+        polar=dict(radialaxis=dict(range=[0,1])),
+        showlegend=False,
+        title=title,
+        template="plotly_white",
+        height=500
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ----------------------------
@@ -221,48 +232,105 @@ def display_binary_indicator(pred, title="Prediction Result"):
         st.progress(0)
 
 
+# ----------------------------
+# Confusion Matrix
+# ----------------------------
 def plot_confusion_matrix(cm, class_names=None, title="Confusion Matrix", normalize=False):
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    import numpy as np
-    
     if class_names is None:
         class_names = [str(i) for i in range(cm.shape[0])]
     
     if normalize:
         cm_display = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-        fmt = ".2f"
+        z_text = np.round(cm_display, 2)
     else:
         cm_display = cm
-        fmt = "d"
+        z_text = cm_display
     
-    num_classes = cm.shape[0]
-    # Dynamically scale figure: width = number of classes * factor
-    fig_width = max(6, num_classes * 1.2)
-    fig_height = max(4, num_classes * 1.0)
-    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-    
-    sns.heatmap(cm_display, annot=False, fmt=fmt, cmap="Blues", cbar=True,
-                square=False, linewidths=0.5, ax=ax)
-    
-    # Overlay numbers manually to guarantee visibility
-    for i in range(cm_display.shape[0]):
-        for j in range(cm_display.shape[1]):
-            value = cm_display[i, j]
-            text_color = "white" if value > cm_display.max() / 2 else "black"
-            ax.text(j + 0.5, i + 0.5, f"{value:{fmt}}",
-                    ha="center", va="center", color=text_color, fontsize=12, fontweight="bold")
-    
-    ax.set_xlabel("Predicted", fontsize=12, fontweight="bold")
-    ax.set_ylabel("True", fontsize=12, fontweight="bold")
-    ax.set_xticks(np.arange(len(class_names)) + 0.5)
-    ax.set_yticks(np.arange(len(class_names)) + 0.5)
-    ax.set_xticklabels(class_names, rotation=45, ha="right", fontsize=12)
-    ax.set_yticklabels(class_names, rotation=0, fontsize=12)
-    ax.set_title(title, fontsize=16, fontweight="bold", pad=20)
-    
-    plt.tight_layout()
-    st.pyplot(fig)
+    fig = go.Figure(data=go.Heatmap(
+        z=cm_display,
+        x=class_names,
+        y=class_names,
+        text=z_text,
+        texttemplate="%{text}",
+        colorscale='Blues',
+        showscale=True
+    ))
+    fig.update_layout(
+        title=title,
+        xaxis_title="Predicted",
+        yaxis_title="True",
+        template="plotly_white",
+        height=400
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+from sklearn.metrics import roc_curve, auc
+import plotly.graph_objects as go
+import plotly.express as px
+import streamlit as st
+import numpy as np
+
+# ----------------------------
+# ROC Curve
+# ----------------------------
+def plot_roc_curve_plotly(y_true, probs_class1, title="ROC Curve"):
+    try:
+        fpr, tpr, _ = roc_curve(y_true, probs_class1)
+        roc_auc = auc(fpr, tpr)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=fpr, y=tpr, mode='lines', name=f"AUC = {roc_auc:.3f}", line=dict(width=2)))
+        fig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', name='Random', line=dict(dash='dash')))
+        fig.update_layout(
+            title=title,
+            xaxis_title="False Positive Rate",
+            yaxis_title="True Positive Rate",
+            template="plotly_white",
+            height=400
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.warning(f"ROC could not be computed: {e}")
+
+
+# ----------------------------
+# Probability Distribution (Class 1)
+# ----------------------------
+def plot_prob_distribution_plotly(probs_class1, title="Predicted Class-1 Probability Distribution"):
+    fig = px.histogram(
+        x=probs_class1,
+        nbins=30,
+        marginal="box",
+        histnorm="probability",
+        labels={"x": "Probability", "y": "Density"},
+        title=title
+    )
+    fig.update_layout(template="plotly_white", height=350)
+    st.plotly_chart(fig, use_container_width=True)
+
+
+# ----------------------------
+# Error Distribution (Correct vs Incorrect)
+# ----------------------------
+def plot_error_distribution_plotly(preds, y_true, title="Correct (1) vs Incorrect (0) (window index)"):
+    correctness = (preds == y_true).astype(int)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        y=correctness,
+        mode='markers',
+        marker=dict(color=correctness, colorscale=["red", "green"], size=8),
+        name="Correctness"
+    ))
+    fig.update_layout(
+        title=title,
+        yaxis=dict(title="Correct (1) / Incorrect (0)", range=[-0.1, 1.1]),
+        xaxis=dict(title="Window Index"),
+        template="plotly_white",
+        height=250
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
 
 
 # ----------------------------
@@ -288,7 +356,7 @@ with tab1:
         st.success("Dummy EEG generated!")
         st.write(f"Shape: {np.array(dummy_input).shape}")
         st.dataframe(pd.DataFrame(dummy_input), height=300)
-        plot_raw_eeg_signal(np.array(dummy_input))
+        plot_raw_eeg_signal_plotly(np.array(dummy_input))
 
     if "dummy_input" in st.session_state:
         st.markdown("### Run Inference")
@@ -341,7 +409,7 @@ with tab2:
 
                 # For raw plot, show representative first window only (avoid massive images)
                 rep_window = X[0]
-                plot_raw_eeg_signal(rep_window)
+                plot_raw_eeg_signal_plotly(rep_window)
 
                 # Call batch predict endpoint (one HTTP call)
                 res = call_predict_batch_subject(subject_id, X.tolist())
@@ -383,34 +451,13 @@ with tab2:
                     st.markdown("**Per-class metrics**")
                     st.dataframe(per_class_df)
 
-                    # ROC (needs prob of positive class)
+                    # Define class-1 probabilities first
                     probs_class1 = probs[:, 1] if probs.shape[1] > 1 else probs[:, 0]
-                    try:
-                        fpr, tpr, _ = roc_curve(Y, probs_class1)
-                        roc_auc = auc(fpr, tpr)
-                        fig, ax = plt.subplots(figsize=(5, 4))
-                        ax.plot(fpr, tpr, label=f"AUC = {roc_auc:.3f}")
-                        ax.plot([0, 1], [0, 1], linestyle="--")
-                        ax.set_xlabel("False Positive Rate")
-                        ax.set_ylabel("True Positive Rate")
-                        ax.set_title("ROC Curve")
-                        ax.legend()
-                        st.pyplot(fig)
-                    except Exception as e:
-                        st.warning(f"ROC could not be computed: {e}")
 
-                    # Probability distribution
-                    fig, ax = plt.subplots(figsize=(6, 3))
-                    sns.histplot(probs_class1, kde=True, ax=ax)
-                    ax.set_title("Predicted Class-1 Probability Distribution")
-                    st.pyplot(fig)
-
-                    # Error distribution (which windows wrong)
-                    correctness = (preds == Y).astype(int)
-                    fig, ax = plt.subplots(figsize=(12, 2))
-                    ax.plot(correctness, marker="o", linestyle="None")
-                    ax.set_title("Correct (1) vs Incorrect (0) (window index)")
-                    st.pyplot(fig)
+                    # Now call the new Plotly functions
+                    plot_roc_curve_plotly(Y, probs_class1)
+                    plot_prob_distribution_plotly(probs_class1)
+                    plot_error_distribution_plotly(preds, Y)
 
                      # ----------------- DUMMY-STYLE PLOTS FOR REAL -----------------
                     probs_mean = probs.mean(axis=0).tolist()
@@ -446,7 +493,7 @@ with tab2:
 
                     # representative raw window
                     rep_window = X[0]
-                    plot_raw_eeg_signal(rep_window)
+                    plot_raw_eeg_signal_plotly(rep_window)
 
                     # call batch endpoint
                     res = call_predict_batch_subject(subj, X.tolist())
@@ -499,24 +546,21 @@ with tab2:
                     cm_all = confusion_matrix(overall_labels, overall_preds)
                     plot_confusion_matrix(cm_all, title=f"Combined Confusion Matrix")
 
-                    # combined ROC using all positive probs (approx)
+                    # # combined ROC using all positive probs (approx)
+                    # First, collect all positive-class probabilities as before
                     all_probs_class1 = []
                     for subj, r in results.items():
                         arr = np.array(r["probs"])
                         if arr.size and arr.shape[1] > 1:
                             all_probs_class1.extend(arr[:, 1].tolist())
-                    try:
-                        if len(all_probs_class1) == overall_labels.size:
-                            fpr, tpr, _ = roc_curve(overall_labels, np.array(all_probs_class1))
-                            roc_auc = auc(fpr, tpr)
-                            fig, ax = plt.subplots(figsize=(5, 4))
-                            ax.plot(fpr, tpr, label=f"AUC = {roc_auc:.3f}")
-                            ax.plot([0, 1], [0, 1], linestyle="--")
-                            ax.set_title("Combined ROC")
-                            ax.legend()
-                            st.pyplot(fig)
-                    except Exception as e:
-                        st.warning(f"Combined ROC error: {e}")
+
+                    # Ensure array and lengths match
+                    all_probs_class1 = np.array(all_probs_class1)
+
+                    if len(all_probs_class1) == overall_labels.size:
+                        # Use the same Plotly ROC function
+                        plot_roc_curve_plotly(overall_labels, all_probs_class1, title="Combined ROC")
+
 
                     # Combined dummy-style multi-subject plots
                     combined_results_dict = {s: {"probabilities": np.array(r["probs"]).mean(axis=0).tolist()} for s, r in results.items()}
