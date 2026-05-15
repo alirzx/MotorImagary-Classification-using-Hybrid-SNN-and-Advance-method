@@ -1,0 +1,9 @@
+=== Hyperparameter Configuration ===
+lr: 0.00017020214022638887
+threshold: 0.7327533046943969
+decay: 0.8476480913029437
+dropout: 0.6341755277635874
+num_heads: 8
+ffn_hidden: 64
+
+===================================
