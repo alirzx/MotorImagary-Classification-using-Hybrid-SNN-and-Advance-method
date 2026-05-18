@@ -2,8 +2,6 @@
 
 ![Project Banner](https://github.com/alirzx/MotorImagary-Classification-using-Hybrid-SNN-and-Advance-method/blob/main/bciiv2a.png?raw=true)
 
-
-
 # SpiTranNet: Hybrid Spiking Neural Network with Transformer for Motor Imagery EEG Classification
 
 > **A brain–computer interface (BCI) system that combines biologically plausible Leaky Integrate‑and‑Fire (LIF) neurons with a Transformer attention mechanism to classify motor imagery EEG signals from the BCI Competition IV‑2a dataset.**
@@ -374,8 +372,7 @@ SpiTranNet/
 │   │
 │   └── mne_data/               │  MOABB dataset cache (auto‑created)
 │
-├── figures/                    ── (optional) paper figures
-├── scripts/                    ── (optional) training scripts
+├──
 │
 ├── requirements.txt
 └── .gitignore
@@ -409,12 +406,14 @@ The model achieves a **mean accuracy of 77 %** across 9 subjects on the 4‑cl
 If you use this code or architecture in your research, please cite:
 
 ```bibtex
-@article{spitrannet2025,
-  title     = {SpiTranNet: A Hybrid Spiking Neural Network with Transformer
-               for Motor Imagery EEG Classification},
-  author    = {Your Name(s)},
-  journal   = {arXiv preprint},
-  year      = {2025}
+@inproceedings{titkanlou2026spitrannet,
+  title={SpiTranNet-LIF: A Spiking Neural Network–Transformer Framework for Efficient Motor Imagery Decoding},
+  author={Titkanlou, Maryam Khoshkhooy and Hashemi, Alireza and Mouček, Roman},
+  booktitle={Proceedings of the 18th International Conference on Agents and Artificial Intelligence (ICAART 2026)},
+  pages={3710--3718},
+  year={2026},
+  publisher={SCITEPRESS},
+  doi={10.5220/0014468700004052}
 }
 ```
 
