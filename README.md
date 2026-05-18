@@ -408,7 +408,7 @@ If you use this code or architecture in your research, please cite:
 ```bibtex
 @inproceedings{titkanlou2026spitrannet,
   title={SpiTranNet-LIF: A Spiking Neural Network–Transformer Framework for Efficient Motor Imagery Decoding},
-  author={Titkanlou, Maryam Khoshkhooy and Hashemi, Alireza and Mouček, Roman},
+  author={Titkanlou, Maryam Khoshkhooy Alireza Hashemi, Mouček, Roman},
   booktitle={Proceedings of the 18th International Conference on Agents and Artificial Intelligence (ICAART 2026)},
   pages={3710--3718},
   year={2026},
