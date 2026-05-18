@@ -93,6 +93,19 @@ def call_dummy_predict_subject(subject_id: int):
         st.error(f"Dummy API Error: {response.status_code} - {response.text}")
         return None
 
+
+
+# ============================
+# FIXED METRIC WRAPPER
+# ============================
+def safe_prf(Y, preds):
+    prec, rec, f1, supp = precision_recall_fscore_support(
+        Y, preds,
+        labels=[0, 1],
+        zero_division=0
+    )
+    return prec, rec, f1, supp
+
     
 # ----------------------------
 # Visualization Helpers (Plotly)
@@ -387,47 +400,42 @@ with tab1:
 with tab2:
     st.subheader("Fetch Real EEG Data Automatically (and evaluate)")
 
-    # ---------------- SINGLE SUBJECT ----------------
     subject_id = st.selectbox("Select Subject to Fetch", SUBJECT_IDS, key="real_subject_select")
 
     colA, colB = st.columns(2)
+
     with colA:
         if st.button("Fetch & Predict Single Subject"):
-            # Fetch subject windows
             data = fetch_real_data(subject_id)
             if not data or "data" not in data:
                 st.error("Failed to fetch subject data.")
             else:
-                X = np.array(data["data"])  # shape (N,22,1000)
+                X = np.array(data["data"])
                 Y = np.array(data["labels"])
+
                 st.session_state["real_input"] = X.tolist()
 
                 st.success(f"Fetched real EEG: subject {subject_id}, windows={X.shape[0]}")
-                # Flatten for display only
                 eeg_display = X.reshape(X.shape[0], -1)
                 st.dataframe(pd.DataFrame(eeg_display), height=300)
 
-                # For raw plot, show representative first window only (avoid massive images)
                 rep_window = X[0]
                 plot_raw_eeg_signal_plotly(rep_window)
 
-                # Call batch predict endpoint (one HTTP call)
                 res = call_predict_batch_subject(subject_id, X.tolist())
                 if not res:
                     st.error("Prediction failed.")
                 else:
                     preds = np.array(res["predictions"])
                     probs = np.array(res["probabilities"])
+
                     if probs.ndim == 1:
                         probs = np.vstack([np.array(p) for p in res["probabilities"]])
 
-                   
-                    # Summary
                     acc = (preds == Y).mean() if len(Y) > 0 else None
                     st.markdown(f"### Subject {subject_id} results — accuracy: **{acc:.3f}** (count={res['count']})")
                     st.write(f"API batch time: {res.get('batch_infer_time_s', 0):.3f}s, per-window avg: {res.get('per_window_avg_ms', 0):.2f}ms, cache_hits: {res.get('cache_hits', 0)}")
-                    
-                    # show first few predictions
+
                     df_small = pd.DataFrame({
                         "true": Y.tolist(),
                         "pred": preds.tolist(),
@@ -436,43 +444,42 @@ with tab2:
                     })
                     st.dataframe(df_small.head(50))
 
-                    # Confusion matrix
                     cm = confusion_matrix(Y, preds)
                     plot_confusion_matrix(cm, title=f"Confusion Matrix Subject {subject_id}")
 
-                    # Per-class metrics
-                    prec, rec, f1, supp = precision_recall_fscore_support(Y, preds, zero_division=0, average=None)
+                    # 🔥 FIX APPLIED HERE
+                    prec, rec, f1, supp = safe_prf(Y, preds)
+
                     per_class_df = pd.DataFrame({
                         "precision": prec,
                         "recall": rec,
                         "f1": f1,
                         "support": supp
                     }, index=["class0", "class1"])
+
                     st.markdown("**Per-class metrics**")
                     st.dataframe(per_class_df)
 
-                    # Define class-1 probabilities first
                     probs_class1 = probs[:, 1] if probs.shape[1] > 1 else probs[:, 0]
 
-                    # Now call the new Plotly functions
                     plot_roc_curve_plotly(Y, probs_class1)
                     plot_prob_distribution_plotly(probs_class1)
                     plot_error_distribution_plotly(preds, Y)
 
-                     # ----------------- DUMMY-STYLE PLOTS FOR REAL -----------------
                     probs_mean = probs.mean(axis=0).tolist()
                     plot_probabilities_single(probs_mean, subject_id)
+
                     results_dict_single = {subject_id: {"probabilities": probs_mean}}
                     plot_prob_heatmap(results_dict_single)
                     plot_radar_multisubject(results_dict_single)
+
                     pred_majority = int(np.round(preds.mean()))
                     display_binary_indicator(pred_majority, title=f"Binary Indicator — Subject {subject_id}")
 
-
-    # ---------------- ALL SUBJECTS ----------------
     with colB:
         if st.button("Fetch & Predict All Subjects"):
             data = fetch_real_data()
+
             if not data:
                 st.error("Failed to fetch all subjects.")
             else:
@@ -483,19 +490,17 @@ with tab2:
                 results = {}
 
                 for subj, subj_data in data.items():
-                    X = np.array(subj_data["data"])  # (N, 22, 1000)
+                    X = np.array(subj_data["data"])
                     Y = np.array(subj_data["labels"])
+
                     st.markdown(f"## Subject {subj} — windows {X.shape[0]}")
 
-                    # flatten for display
                     eeg_display = X.reshape(X.shape[0], -1)
                     st.dataframe(pd.DataFrame(eeg_display).head(50), height=200)
 
-                    # representative raw window
                     rep_window = X[0]
                     plot_raw_eeg_signal_plotly(rep_window)
 
-                    # call batch endpoint
                     res = call_predict_batch_subject(subj, X.tolist())
                     if not res:
                         st.error(f"Prediction failed for subject {subj}")
@@ -503,88 +508,86 @@ with tab2:
 
                     preds = np.array(res["predictions"])
                     probs = np.array(res["probabilities"])
+
                     if probs.ndim == 1:
                         probs = np.vstack([np.array(p) for p in res["probabilities"]])
 
-                    # ----------------- DUMMY-STYLE PLOTS PER SUBJECT -----------------
                     probs_mean = probs.mean(axis=0).tolist()
                     results_dict_single = {subj: {"probabilities": probs_mean}}
+
                     plot_probabilities_single(probs_mean, subj)
-                    
                     plot_prob_heatmap(results_dict_single)
                     plot_radar_multisubject(results_dict_single)
+
                     pred_majority = int(np.round(preds.mean()))
                     display_binary_indicator(pred_majority, title=f"Binary Indicator — Subject {subj}")
 
-                    # per-subject metrics
                     acc = (preds == Y).mean() if len(Y) > 0 else None
-                    subj_metrics[subj] = {"accuracy": float(acc), "count": int(res["count"]), "cache_hits": int(res["cache_hits"])}
-                    timing_info[subj] = {"batch_time_s": res.get("batch_infer_time_s", 0), "per_window_ms": res.get("per_window_avg_ms", 0), "http_time_s": res.get("_http_time_s", 0)}
 
-                    # collect for combined metrics
+                    subj_metrics[subj] = {
+                        "accuracy": float(acc),
+                        "count": int(res["count"]),
+                        "cache_hits": int(res["cache_hits"])
+                    }
+
+                    timing_info[subj] = {
+                        "batch_time_s": res.get("batch_infer_time_s", 0),
+                        "per_window_ms": res.get("per_window_avg_ms", 0),
+                        "http_time_s": res.get("_http_time_s", 0)
+                    }
+
                     overall_preds.extend(preds.tolist())
                     overall_labels.extend(Y.tolist())
 
-                    # quick confusion matrix per subject
                     cm = confusion_matrix(Y, preds)
                     plot_confusion_matrix(cm, title=f"Confusion Matrix Subject {subj}")
 
-                    # store result
                     results[subj] = {
                         "preds": preds.tolist(),
                         "probs": probs.tolist(),
                         "labels": Y.tolist()
                     }
 
-                # Combined evaluation
                 overall_preds = np.array(overall_preds)
                 overall_labels = np.array(overall_labels)
+
                 if overall_preds.size > 0:
                     combined_acc = (overall_preds == overall_labels).mean()
                     st.subheader(f"Combined accuracy across fetched subjects: {combined_acc:.3f}")
 
                     cm_all = confusion_matrix(overall_labels, overall_preds)
-                    plot_confusion_matrix(cm_all, title=f"Combined Confusion Matrix")
+                    plot_confusion_matrix(cm_all, title="Combined Confusion Matrix")
 
-                    # # combined ROC using all positive probs (approx)
-                    # First, collect all positive-class probabilities as before
                     all_probs_class1 = []
                     for subj, r in results.items():
                         arr = np.array(r["probs"])
                         if arr.size and arr.shape[1] > 1:
                             all_probs_class1.extend(arr[:, 1].tolist())
 
-                    # Ensure array and lengths match
                     all_probs_class1 = np.array(all_probs_class1)
 
                     if len(all_probs_class1) == overall_labels.size:
-                        # Use the same Plotly ROC function
                         plot_roc_curve_plotly(overall_labels, all_probs_class1, title="Combined ROC")
 
+                    combined_results_dict = {
+                        s: {"probabilities": np.array(r["probs"]).mean(axis=0).tolist()}
+                        for s, r in results.items()
+                    }
 
-                    # Combined dummy-style multi-subject plots
-                    combined_results_dict = {s: {"probabilities": np.array(r["probs"]).mean(axis=0).tolist()} for s, r in results.items()}
                     plot_multisubject_probabilities(combined_results_dict)
                     plot_prob_heatmap(combined_results_dict)
                     plot_radar_multisubject(combined_results_dict)
 
-                    # show per-subject summary table
                     df_subj = pd.DataFrame.from_dict(subj_metrics, orient="index")
                     st.markdown("### Per-subject summary")
                     st.dataframe(df_subj)
 
-                    # response time summary
                     df_time = pd.DataFrame.from_dict(timing_info, orient="index")
                     st.markdown("### Response time summary (per-subject)")
                     st.dataframe(df_time)
 
-                    # error distribution across all windows
                     correctness = (overall_preds == overall_labels).astype(int)
                     fig, ax = plt.subplots(figsize=(12, 2))
                     ax.plot(correctness, marker="o", linestyle="None")
                     ax.set_title("Combined Correct (1) vs Incorrect (0) across windows")
                     st.pyplot(fig)
-
-# Footer
-st.markdown("---")
-st.markdown("✨ Built with FastAPI + Streamlit for real-time BCI inference.")
