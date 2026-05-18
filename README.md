@@ -4,16 +4,6 @@
 
 
 
-
-
-
-
-# 📄 First README — Top-Level (Project Overview, Concepts, Paper)
-
-I'll craft this as a **comprehensive journal‑repo‑grade README** — the kind that accompanies a paper on arXiv or a conference proceedings. It explains the **why**, the **how**, and the **architecture** at a conceptual/mathematical level, then summarizes the repo.
-
----
-
 # SpiTranNet: Hybrid Spiking Neural Network with Transformer for Motor Imagery EEG Classification
 
 > **A brain–computer interface (BCI) system that combines biologically plausible Leaky Integrate‑and‑Fire (LIF) neurons with a Transformer attention mechanism to classify motor imagery EEG signals from the BCI Competition IV‑2a dataset.**
